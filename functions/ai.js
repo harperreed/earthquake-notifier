@@ -16,7 +16,7 @@ async function getAISummary(data) {
   Limit to 3 major points. Be concise. Don't be verbose.
   You can use html to style it (b, i, and u tags)`;
 
-  const model = process.env.OPENAI_QUICKMODEL;
+  const model = process.env.OPENAI_MODEL;
 
   const openAiCompletionArgs = {
     model: model,

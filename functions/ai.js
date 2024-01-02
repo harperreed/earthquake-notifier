@@ -1,8 +1,6 @@
 /* eslint-disable require-jsdoc */
 
-const { OpenAI } = require("openai");
-
-const logger = require("firebase-functions/logger");
+const {OpenAI} = require("openai");
 
 
 async function getAISummary(data) {
@@ -23,8 +21,8 @@ async function getAISummary(data) {
   const openAiCompletionArgs = {
     model: model,
     messages: [
-      { "role": "system", "content": earthQuakeBotPrompt },
-      { "role": "user", "content": dataStr },
+      {"role": "system", "content": earthQuakeBotPrompt},
+      {"role": "user", "content": dataStr},
     ],
   };
 

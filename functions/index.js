@@ -1,12 +1,12 @@
 /* eslint-disable require-jsdoc */
-const { onRequest } = require("firebase-functions/v2/https");
-const { initializeApp } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
-const { onSchedule } = require("firebase-functions/v2/scheduler");
+const {onRequest} = require("firebase-functions/v2/https");
+const {initializeApp} = require("firebase-admin/app");
+const {getFirestore} = require("firebase-admin/firestore");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
 
 const axios = require("axios");
-const Pushover = require('pushover-notifications')
-const { getAISummary } = require("./ai");
+const Pushover = require("pushover-notifications");
+const {getAISummary} = require("./ai");
 // Initialize Firebase
 initializeApp();
 
@@ -141,7 +141,7 @@ async function markAlertAsSent(earthquakeId, earthquake) {
 // HTTP Triggered Function
 exports.earthquakeCheck = onRequest(async (req, res) => {
   // Default values or use query parameters
-  //37.350; 136.933
+  // 37.350; 136.933
   const latitude = req.query.lat || "35.662139";
   const longitude = req.query.lng || "138.568222";
   const radius = req.query.radius || "100";

@@ -67,7 +67,7 @@ async function checkEarthquake(latitude, longitude, radius) {
       // Mark all earthquakes as having sent an alert
       for (const earthquake of earthquakeData) {
         const earthquakeId = earthquake.id;
-        await markAlertAsSent(earthquakeId);
+        await markAlertAsSent(earthquakeId, earthquake);
       }
 
       return message;
@@ -127,9 +127,10 @@ async function checkIfAlertSent(earthquakeId) {
 }
 
 // Function to mark an earthquake ID as having sent an alert
-async function markAlertAsSent(earthquakeId) {
+async function markAlertAsSent(earthquakeId, earthquake) {
   try {
-    await db.collection("sent_alerts").doc(earthquakeId).set({ sent: true });
+    earthquake.sent = true;
+    await db.collection("sent_alerts").doc(earthquakeId).set(earthquake);
     console.log(`Alert marked as sent for earthquake ID: ${earthquakeId}`);
   } catch (error) {
     console.error("Error marking alert as sent:", error);
@@ -140,6 +141,7 @@ async function markAlertAsSent(earthquakeId) {
 // HTTP Triggered Function
 exports.earthquakeCheck = onRequest(async (req, res) => {
   // Default values or use query parameters
+  //37.350; 136.933
   const latitude = req.query.lat || "35.662139";
   const longitude = req.query.lng || "138.568222";
   const radius = req.query.radius || "100";

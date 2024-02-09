@@ -13,6 +13,7 @@ async function getAISummary(data) {
   Don't mention the data directly. 
   Use bullets where necessary.
   You summarize the data in english.
+  Put a headline at the top
   Limit to 3 major points. Be concise. Don't be verbose.
   You can use html to style it (b, i, and u tags)`;
 

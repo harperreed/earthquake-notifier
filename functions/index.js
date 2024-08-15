@@ -1,4 +1,3 @@
-/* eslint-disable require-jsdoc */
 const {onRequest} = require("firebase-functions/v2/https");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore} = require("firebase-admin/firestore");
@@ -7,6 +6,7 @@ const {onSchedule} = require("firebase-functions/v2/scheduler");
 const axios = require("axios");
 const Pushover = require("pushover-notifications");
 const {getAISummary} = require("./ai");
+
 // Initialize Firebase
 initializeApp();
 
@@ -19,12 +19,12 @@ async function checkEarthquake(latitude, longitude, radius) {
   try {
     const response = await axios.get(url);
     const data = response.data;
-    let alertPriority = -1;
     const earthquakeData = [];
+
     if (data.features && data.features.length > 0) {
       for (const earthquake of data.features) {
         const earthquakeInfo = earthquake.properties;
-        const earthquakeId = earthquake.id; // Unique ID for the earthquake
+        const earthquakeId = earthquake.id;
 
         // Check if an alert for this earthquake ID has already been sent
         const isAlertSent = await checkIfAlertSent(earthquakeId);
@@ -32,47 +32,37 @@ async function checkEarthquake(latitude, longitude, radius) {
           continue; // Skip this earthquake as an alert has already been sent
         }
 
+        // Determine alert priority based on magnitude and depth
+        const alertPriority = determineAlertPriority(earthquakeInfo.mag, earthquakeInfo.depth);
 
-        // console.log(earthquakeInfo.title);
-        switch (true) {
-          case (earthquakeInfo.mag >= 5.0 && earthquakeInfo.mag < 6.0):
-            if (alertPriority < 0) {
-              alertPriority = 0;
-            }
-            break;
-          case (earthquakeInfo.mag >= 6.0 && earthquakeInfo.mag < 8.0):
-            if (alertPriority < 1) {
-              alertPriority = 1;
-            }
-
-            break;
-          case (earthquakeInfo.mag >= 8.0):
-            if (alertPriority < 2) {
-              alertPriority = 2;
-            }
-            break;
+        if (alertPriority >= 0) {
+          earthquakeData.push({...earthquake, alertPriority});
         }
-        earthquakeData.push(earthquake);
       }
 
       if (earthquakeData.length == 0) {
-        return "No new earthquakes detected.";
+        return "No new significant earthquakes detected.";
       }
 
-      console.log(earthquakeData.length);
+      console.log(`${earthquakeData.length} new significant earthquakes detected.`);
       const message = await manufactureAlert(JSON.stringify(earthquakeData));
 
-      await sendAlert(message, alertPriority);
+      // Send alerts for each priority level
+      for (let priority = 2; priority >= 0; priority--) {
+        const priorityEarthquakes = earthquakeData.filter(eq => eq.alertPriority === priority);
+        if (priorityEarthquakes.length > 0) {
+          await sendAlert(message, priority);
+        }
+      }
 
       // Mark all earthquakes as having sent an alert
       for (const earthquake of earthquakeData) {
-        const earthquakeId = earthquake.id;
-        await markAlertAsSent(earthquakeId, earthquake);
+        await markAlertAsSent(earthquake.id, earthquake);
       }
 
       return message;
     } else {
-      return "No significant earthquakes detected.";
+      return "No earthquakes detected.";
     }
   } catch (error) {
     console.error("Error checking for earthquakes:", error);
@@ -80,8 +70,17 @@ async function checkEarthquake(latitude, longitude, radius) {
   }
 }
 
+// Function to determine alert priority based on magnitude and depth
+function determineAlertPriority(magnitude, depth) {
+  if (magnitude >= 8.0) return 2;
+  if (magnitude >= 7.0) return 2;
+  if (magnitude >= 6.0) return 1;
+  if (magnitude >= 5.0 && depth < 70) return 1; // Shallow earthquakes are more likely to be felt
+  if (magnitude >= 4.5 && depth < 30) return 0; // Very shallow earthquakes can be significant even at lower magnitudes
+  return -1; // No alert for smaller earthquakes
+}
 
-// Function to send Pushover alert
+// Function to generate alert message
 async function manufactureAlert(data) {
   const summary = await getAISummary(data);
   return summary;
@@ -90,8 +89,8 @@ async function manufactureAlert(data) {
 // Function to send Pushover alert
 async function sendAlert(message, priority) {
   const pushoverConfig = {
-    token: process.env.PUSHOVER_TOKEN, // Replace with your Pushover API token
-    user: process.env.PUSHOVER_USER, // Replace with your Pushover user key
+    token: process.env.PUSHOVER_TOKEN,
+    user: process.env.PUSHOVER_USER,
   };
 
   // Initialize Pushover
@@ -122,7 +121,7 @@ async function checkIfAlertSent(earthquakeId) {
     return doc.exists;
   } catch (error) {
     console.error("Error checking alert status:", error);
-    throw error; // You can decide to handle this differently
+    throw error;
   }
 }
 
@@ -134,27 +133,25 @@ async function markAlertAsSent(earthquakeId, earthquake) {
     console.log(`Alert marked as sent for earthquake ID: ${earthquakeId}`);
   } catch (error) {
     console.error("Error marking alert as sent:", error);
-    throw error; // You can decide to handle this differently
+    throw error;
   }
 }
 
 // HTTP Triggered Function
 exports.earthquakeCheck = onRequest(async (req, res) => {
-  // Default values or use query parameters
-  // 37.350; 136.933
   const latitude = req.query.lat || "35.662139";
   const longitude = req.query.lng || "138.568222";
-  const radius = req.query.radius || "100";
+  const radius = req.query.radius || "500"; // Increased default radius
 
   const result = await checkEarthquake(latitude, longitude, radius);
   res.send(result);
 });
 
-exports.earthquakeCheckCrontab = onSchedule("0 */1 * * *", async (event) => {
-  // Default values or use query parameters
+// Scheduled Function
+exports.earthquakeCheckCrontab = onSchedule("*/30 * * * *", async (event) => {
   const latitude = "35.662139";
   const longitude = "138.568222";
-  const radius = "100";
+  const radius = "500"; // Increased radius
 
   const result = await checkEarthquake(latitude, longitude, radius);
   console.log(result);

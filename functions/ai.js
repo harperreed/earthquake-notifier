@@ -20,6 +20,7 @@ async function getAISummary(data) {
   - How far from Kofu, Yamanashi is the earthquake?
   - What is the impact of the earthquake?
   - Were people effected?
+  - Include the URL
   - Only mention if the PGA values (Peak Ground Acceleration) it is significant? .
     - PGA > 0.34g (severe shaking)
     - PGA > 0.092g (strong shaking)

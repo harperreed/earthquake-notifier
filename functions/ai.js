@@ -1,11 +1,11 @@
 /* eslint-disable require-jsdoc */
 
-const { OpenAI } = require("openai");
+const {OpenAI} = require("openai");
 
 async function getAISummary(data) {
-    const dataStr = JSON.stringify(data);
-    // eslint-disable-next-line max-len
-    const earthQuakeBotPrompt = `
+  const dataStr = JSON.stringify(data);
+  // eslint-disable-next-line max-len
+  const earthQuakeBotPrompt = `
   You are a news reporter in Kofu Yamanashi that is doing a live blog about an earthquake(s).
   You are given a list of earthquakes in JSON format.
   Your job is to explain the data in English.
@@ -33,29 +33,29 @@ async function getAISummary(data) {
   It is ok if these things are not appropriate for the data you are given. If that is the case, then just make up a story that fits the data you are given.
   `;
 
-    const userPrompt = `${dataStr}`;
+  const userPrompt = `${dataStr}`;
 
-    const model = process.env.OPENAI_MODEL;
+  const model = process.env.OPENAI_MODEL;
 
-    const openAiCompletionArgs = {
-        model: model,
-        messages: [
-            { role: "system", content: earthQuakeBotPrompt },
-            { role: "user", content: userPrompt },
-        ],
-    };
+  const openAiCompletionArgs = {
+    model: model,
+    messages: [
+      {role: "system", content: earthQuakeBotPrompt},
+      {role: "user", content: userPrompt},
+    ],
+  };
 
-    const openai = new OpenAI();
-    // openai.baseURL = "https://api.dud.org/api/v1";
-    openai.baseURL = "https://openaiproxy-baxvbakvia-uc.a.run.app/v1";
-    const response = await openai.chat.completions.create(openAiCompletionArgs);
-    // logger.info({ response });
+  const openai = new OpenAI();
+  // openai.baseURL = "https://api.dud.org/api/v1";
+  openai.baseURL = "https://openaiproxy-baxvbakvia-uc.a.run.app/v1";
+  const response = await openai.chat.completions.create(openAiCompletionArgs);
+  // logger.info({ response });
 
-    const aiResponse = response.choices[0].message.content;
-    console.log(aiResponse);
-    return aiResponse;
+  const aiResponse = response.choices[0].message.content;
+  console.log(aiResponse);
+  return aiResponse;
 }
 
 module.exports = {
-    getAISummary,
+  getAISummary,
 };

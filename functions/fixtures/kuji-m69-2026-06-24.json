@@ -1,0 +1,40 @@
+{
+  "type": "Feature",
+  "properties": {
+    "mag": 6.9,
+    "place": "30 km ENE of Kuji, Japan",
+    "time": 1782340214931,
+    "updated": 1782398687472,
+    "tz": null,
+    "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us6000t7zq",
+    "detail": "https://earthquake.usgs.gov/fdsnws/event/1/query?eventid=us6000t7zq&format=geojson",
+    "felt": 92,
+    "cdi": 6.9,
+    "mmi": 6.149,
+    "alert": "green",
+    "status": "reviewed",
+    "tsunami": 0,
+    "sig": 796,
+    "net": "us",
+    "code": "6000t7zq",
+    "ids": ",pt26175002,us6000t7zq,atth5qif,",
+    "sources": ",pt,us,at,",
+    "types": ",dyfi,ground-failure,internal-origin,losspager,moment-tensor,origin,phase-data,shakemap,",
+    "nst": 110,
+    "dmin": 0.932,
+    "rms": 0.64,
+    "gap": 34,
+    "magType": "mww",
+    "type": "earthquake",
+    "title": "M 6.9 - 30 km ENE of Kuji, Japan"
+  },
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      142.0981,
+      40.2912,
+      50.923
+    ]
+  },
+  "id": "us6000t7zq"
+}

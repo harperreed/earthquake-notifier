@@ -2,8 +2,10 @@ const {onRequest} = require("firebase-functions/v2/https");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore} = require("firebase-admin/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
+const {defineSecret} = require("firebase-functions/params");
 
 const {createChecker} = require("./checker");
+const {authorize, clampRadius} = require("./httpAuth");
 
 // Initialize Firebase
 initializeApp();
@@ -11,8 +13,18 @@ initializeApp();
 const db = getFirestore();
 const {checkEarthquake, getTodayAlerts} = createChecker(db);
 
+// Shared secret guarding the public HTTP endpoints; provisioned via Secret
+// Manager and required as an X-Quake-Token header on each request.
+const quakeToken = defineSecret("QUAKE_API_TOKEN");
+const httpOpts = {secrets: [quakeToken]};
+
 // New HTTP Triggered Function for Today's Alerts
-exports.todayAlerts = onRequest(async (req, res) => {
+exports.todayAlerts = onRequest(httpOpts, async (req, res) => {
+  if (!authorize(req.get("X-Quake-Token"), quakeToken.value())) {
+    res.status(403).send("Forbidden");
+    return;
+  }
+
   try {
     const alerts = await getTodayAlerts();
 
@@ -37,11 +49,17 @@ exports.todayAlerts = onRequest(async (req, res) => {
 
 
 // HTTP Triggered Function
-exports.earthquakeCheck = onRequest(async (req, res) => {
+exports.earthquakeCheck = onRequest(httpOpts, async (req, res) => {
+  if (!authorize(req.get("X-Quake-Token"), quakeToken.value())) {
+    res.status(403).send("Forbidden");
+    return;
+  }
+
   const latitude = req.query.lat || "35.662139";
   const longitude = req.query.lng || "138.568222";
-  // Wide query radius; alertRange gates alerts by magnitude.
-  const radius = req.query.radius || "1500";
+  // Wide query radius; alertRange gates alerts by magnitude. Clamp user input
+  // so a single request cannot pull an unbounded USGS result set.
+  const radius = clampRadius(req.query.radius);
 
   const result = await checkEarthquake(latitude, longitude, radius);
   res.send(result);

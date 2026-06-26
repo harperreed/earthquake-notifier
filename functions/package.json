@@ -10,7 +10,7 @@
     "logs": "firebase functions:log",
     "test": "node --test",
     "test:coverage": "node --test --experimental-test-coverage",
-    "test:gate": "mise exec firebase -- firebase emulators:exec --only firestore --project demo-quake \"$(mise where node@22)/bin/node --test $PWD/checker.gate.js\""
+    "test:gate": "mise exec firebase -- firebase emulators:exec --only firestore --project demo-quake \"$(mise where node@22)/bin/node --test $PWD/*.gate.js\""
   },
   "engines": {
     "node": "22"

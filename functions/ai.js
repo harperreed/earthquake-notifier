@@ -9,6 +9,13 @@ const SUMMARY_MAX_TOKENS = 256;
 // Bound a hung OpenAI request so the alert hot path cannot block indefinitely.
 const OPENAI_TIMEOUT_MS = 20000;
 
+// Resolve the OpenAI base URL from the environment so the proxy is configurable
+// per deploy instead of hardcoded; fall back to the existing Cloud Run proxy.
+function openAiBaseUrl() {
+  return process.env.OPENAI_BASE_URL ||
+      "https://openaiproxy-baxvbakvia-uc.a.run.app/v1";
+}
+
 async function getAISummary(data) {
   const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
@@ -21,7 +28,7 @@ async function getAISummary(data) {
 
   const openai = new OpenAI({timeout: OPENAI_TIMEOUT_MS});
   // openai.baseURL = "https://api.dud.org/api/v1";
-  openai.baseURL = "https://openaiproxy-baxvbakvia-uc.a.run.app/v1";
+  openai.baseURL = openAiBaseUrl();
   const response = await openai.chat.completions.create(openAiCompletionArgs);
   // logger.info({ response });
 
@@ -32,4 +39,5 @@ async function getAISummary(data) {
 
 module.exports = {
   getAISummary,
+  openAiBaseUrl,
 };

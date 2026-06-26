@@ -1,0 +1,14 @@
+// ABOUTME: Firestore security rules — deny all direct client access. The Cloud
+// ABOUTME: Functions Admin SDK bypasses these, so the app itself is unaffected.
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // The only reader/writer is the Admin SDK inside Cloud Functions, which
+    // bypasses these rules. Block every direct client request as defense in
+    // depth so a leaked project ID cannot read or tamper with alert history.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

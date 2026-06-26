@@ -8,6 +8,7 @@ const {
   buildQueryUrl,
   recentWindowStart,
   startOfTodayTokyo,
+  pushoverPriorityFor,
   REQUEST_TIMEOUT_MS,
 } = require("./checker");
 
@@ -54,4 +55,15 @@ test("startOfTodayTokyo rolls to the next JST day after 15:00 UTC", () => {
 test("REQUEST_TIMEOUT_MS bounds the USGS request", () => {
   assert.ok(Number.isInteger(REQUEST_TIMEOUT_MS));
   assert.ok(REQUEST_TIMEOUT_MS > 0);
+});
+
+test("pushoverPriorityFor raises a felt quake to the audible floor", () => {
+  // Internal priority 0 (felt) must not arrive as a silenceable Pushover 0.
+  assert.equal(pushoverPriorityFor(0), 1);
+});
+
+test("pushoverPriorityFor passes high and emergency priorities through", () => {
+  // 1 stays high; 2 stays emergency (notify.js adds retry/expire for >1).
+  assert.equal(pushoverPriorityFor(1), 1);
+  assert.equal(pushoverPriorityFor(2), 2);
 });

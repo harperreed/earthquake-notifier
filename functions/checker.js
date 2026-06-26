@@ -73,6 +73,18 @@ function startOfTodayTokyo(now) {
   return new Date(midnightUtcLabelled - JST_OFFSET_MS);
 }
 
+/**
+ * Maps an internal alert priority to the Pushover priority used at delivery,
+ * raising a felt quake (internal 0) to Pushover's audible "high" floor so it
+ * never arrives as a silenceable notification. Higher priorities pass through,
+ * so an M7+ quake still delivers at Pushover's emergency level.
+ * @param {number} alertPriority Internal alert priority (0 felt, 1, or 2).
+ * @return {number} The Pushover priority, never below 1.
+ */
+function pushoverPriorityFor(alertPriority) {
+  return Math.max(1, alertPriority);
+}
+
 // The Firestore instance is injected by createChecker so this module stays free
 // of Firebase initialization and can run against the emulator or real Firebase.
 let db;
@@ -219,13 +231,16 @@ async function deliverGroup(group, fromLat, fromLng) {
   const terseMessage = group.earthquakes
       .map((eq) => alertLineForQuake(eq, fromLat, fromLng))
       .join("<br/>");
+  // Felt quakes (internal priority 0) deliver at the audible floor so they are
+  // never silenceable; higher priorities are unchanged.
+  const pushoverPriority = pushoverPriorityFor(group.priority);
 
   try {
     await sendPushover({
       token: process.env.PUSHOVER_TOKEN,
       user: process.env.PUSHOVER_USER,
       message: terseMessage,
-      priority: group.priority,
+      priority: pushoverPriority,
     });
   } catch (error) {
     // The core notification failed; surface it and let the next run retry.
@@ -243,7 +258,7 @@ async function deliverGroup(group, fromLat, fromLng) {
       token: process.env.PUSHOVER_TOKEN,
       user: process.env.PUSHOVER_USER,
       message: summary,
-      priority: group.priority,
+      priority: pushoverPriority,
     });
   } catch (error) {
     // Users already have the terse alert; tell the admin the AI is degraded.
@@ -390,5 +405,6 @@ module.exports = {
   buildQueryUrl,
   recentWindowStart,
   startOfTodayTokyo,
+  pushoverPriorityFor,
   REQUEST_TIMEOUT_MS,
 };

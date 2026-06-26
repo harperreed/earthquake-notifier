@@ -34,3 +34,25 @@ test("system prompt does not call Yamanashi the epicenter", () => {
   const messages = buildSummaryMessages(SAMPLE);
   assert.ok(!/yamanashi as the epicenter/i.test(messages[0].content));
 });
+
+test("system prompt offers the three standard action lines", () => {
+  const prompt = buildSummaryMessages(SAMPLE)[0].content;
+  assert.match(prompt, /No action needed/);
+  assert.match(prompt, /Aftershocks likely/);
+  assert.match(prompt, /Take cover/);
+});
+
+test("system prompt leads with exactly one action line", () => {
+  const prompt = buildSummaryMessages(SAMPLE)[0].content;
+  assert.match(prompt, /exactly one action line/i);
+});
+
+test("system prompt instructs English-only output", () => {
+  const prompt = buildSummaryMessages(SAMPLE)[0].content;
+  assert.match(prompt, /only in english/i);
+});
+
+test("system prompt frames the quake as already past, not live", () => {
+  const prompt = buildSummaryMessages(SAMPLE)[0].content;
+  assert.match(prompt, /already occurred/i);
+});

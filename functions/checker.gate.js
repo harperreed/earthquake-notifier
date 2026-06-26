@@ -101,7 +101,11 @@ test("Jimny delivery survives a real OpenAI outage", async (t) => {
     assert.equal(pushoverMessages.length, 2);
     const [terse, adminAlert] = pushoverMessages;
 
-    assert.match(terse.message, /^M6\.9 · \d+km \w+ Kofu · depth 51km · P1$/);
+    // Shindo leads: the real PGA model puts the far M6.9 at est. shindo 4.
+    assert.match(
+        terse.message,
+        /^est\. shindo 4 · M6\.9 · \d+km \w+ of Kofu · depth 51km · P1$/,
+    );
     assert.equal(terse.priority, 1);
     assert.equal(terse.html, 1);
 

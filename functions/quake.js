@@ -3,12 +3,14 @@
 
 // Function to calculate distance between two points using Haversine formula
 /**
- * Calculates the distance between two geographic points on the Earth using the Haversine formula.
+ * Calculates the distance between two geographic points on the Earth using
+ * the Haversine formula.
  * @param {number} lat1 Latitude of the first point in degrees.
  * @param {number} lon1 Longitude of the first point in degrees.
  * @param {number} lat2 Latitude of the second point in degrees.
  * @param {number} lon2 Longitude of the second point in degrees.
- * @return {number} The distance between the two points in kilometers, rounded to two decimal places.
+ * @return {number} The distance between the two points in kilometers, rounded
+ *     to two decimal places.
  */
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the Earth in km
@@ -25,9 +27,18 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return Math.round(distance * 100) / 100; // Round to 2 decimal places
 }
 
-// Function to estimate Peak Ground Acceleration (PGA) using a simple attenuation relationship
+/**
+ * Estimates Peak Ground Acceleration (PGA) at a site from an earthquake's
+ * magnitude and hypocentral distance using a simplified Boore-Atkinson (2008)
+ * ground-motion model. The result is an approximation, in g.
+ * @param {number} magnitude Moment magnitude of the earthquake.
+ * @param {number} distanceKm Epicentral distance to the site in kilometers.
+ * @param {number} depthKm Hypocentral depth in kilometers.
+ * @return {number} Estimated peak ground acceleration in g.
+ */
 function estimatePGA(magnitude, distanceKm, depthKm) {
-  // This is a simplified version of the Boore-Atkinson (2008) ground motion prediction equation
+  // This is a simplified version of the Boore-Atkinson (2008) ground motion
+  // prediction equation
   // Note: This is still an approximation and should be used cautiously
   const a = 0.03615;
   const b = 0.229;
@@ -43,13 +54,22 @@ function estimatePGA(magnitude, distanceKm, depthKm) {
   return Math.pow(10, log10PGA);
 }
 
-// Function to determine alert priority based on magnitude and depth
+/**
+ * Determines the internal alert priority for an earthquake from its magnitude
+ * and depth. Shallower quakes alert at lower magnitudes because they are more
+ * strongly felt at the surface.
+ * @param {number} magnitude Moment magnitude of the earthquake.
+ * @param {number} depth Hypocentral depth in kilometers.
+ * @return {number} 2 emergency, 1 high, 0 felt, or -1 for no alert.
+ */
 function determineAlertPriority(magnitude, depth) {
-  if (magnitude >= 8.0) return 2;
+  // M7+, including great M8+ quakes, is always emergency priority.
   if (magnitude >= 7.0) return 2;
   if (magnitude >= 6.0) return 1;
-  if (magnitude >= 5.0 && depth < 70) return 1; // Shallow earthquakes are more likely to be felt
-  if (magnitude >= 4.5 && depth < 30) return 0; // Very shallow earthquakes can be significant even at lower magnitudes
+  // Shallow earthquakes are more likely to be felt
+  if (magnitude >= 5.0 && depth < 70) return 1;
+  // Very shallow earthquakes can be significant even at lower magnitudes
+  if (magnitude >= 4.5 && depth < 30) return 0;
   return -1; // No alert for smaller earthquakes
 }
 

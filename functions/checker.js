@@ -89,7 +89,17 @@ function pushoverPriorityFor(alertPriority) {
 // of Firebase initialization and can run against the emulator or real Firebase.
 let db;
 
-// Function to check for earthquakes with parameters
+/**
+ * Checks USGS for recent earthquakes near a point, scores each against the
+ * alert gates, and delivers a notification per priority bucket. Records a
+ * heartbeat and surfaces dependency failures to the admin so a stalled or
+ * broken run is never silent.
+ * @param {string} latitude Center latitude of the monitored point.
+ * @param {string} longitude Center longitude of the monitored point.
+ * @param {string} radius USGS search radius in kilometers.
+ * @return {Promise<{status: string, found: number, sent: number,
+ *     error: ?string}>} The structured run result.
+ */
 async function checkEarthquake(latitude, longitude, radius) {
   const base = process.env.USGS_API_URL || "https://earthquake.usgs.gov";
   const url = buildQueryUrl({
@@ -194,28 +204,27 @@ async function checkEarthquake(latitude, longitude, radius) {
   return result;
 }
 
-// Update the storeAlertInFirebase function to include JMA intensity
+/**
+ * Persists a delivered alert and its quakes to the "alerts" collection so
+ * the daily digest endpoint can replay them. Best-effort: a failure is logged
+ * rather than thrown, so it cannot mask a successful notification.
+ * @param {Array<Object>} earthquakes The scored quakes in this alert.
+ * @param {string} message The delivered alert text (AI summary or terse line).
+ * @param {number} priority The internal alert priority.
+ * @return {Promise<void>}
+ */
 async function storeAlertInFirebase(earthquakes, message, priority) {
   try {
     const alertRef = await db.collection("alerts").add({
       timestamp: FieldValue.serverTimestamp(),
       message: message,
       priority: priority,
-      earthquakes: earthquakes.map((eq) => ({
-        ...eq,
-        estimatedPGA: eq.estimatedPGA,
-      })),
+      earthquakes: earthquakes.map((eq) => ({...eq})),
     });
     console.log(`Alert stored in Firebase with ID: ${alertRef.id}`);
   } catch (error) {
     console.error("Error storing alert in Firebase:", error);
   }
-}
-
-// Function to generate alert message
-async function manufactureAlert(data) {
-  const summary = await getAISummary(data);
-  return summary;
 }
 
 /**
@@ -253,7 +262,7 @@ async function deliverGroup(group, fromLat, fromLng) {
   // terse line above has already notified, so a failure here is only logged.
   let summary = null;
   try {
-    summary = await manufactureAlert(group.earthquakes);
+    summary = await getAISummary(group.earthquakes);
     await sendPushover({
       token: process.env.PUSHOVER_TOKEN,
       user: process.env.PUSHOVER_USER,
@@ -362,7 +371,11 @@ async function markAlertsAsSent(earthquakes) {
   }
 }
 
-// Function to get today's alerts
+/**
+ * Returns the alerts stored so far during the current JST day, most recent
+ * first, for the daily digest endpoint.
+ * @return {Promise<Array<Object>>} Today's stored alert documents.
+ */
 async function getTodayAlerts() {
   try {
     const today = startOfTodayTokyo(new Date());
@@ -377,7 +390,8 @@ async function getTodayAlerts() {
       alerts.push({
         id: doc.id,
         ...doc.data(),
-        timestamp: doc.data().timestamp.toDate(), // Convert Firestore Timestamp to JS Date
+        // Convert Firestore Timestamp to JS Date
+        timestamp: doc.data().timestamp.toDate(),
       });
     });
 

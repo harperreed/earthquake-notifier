@@ -1,3 +1,5 @@
+// ABOUTME: Cloud Functions entrypoint — wires HTTP and scheduled triggers to
+// ABOUTME: the Firestore-injected earthquake checker and alert delivery.
 const {onRequest} = require("firebase-functions/v2/https");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore} = require("firebase-admin/firestore");
@@ -33,19 +35,21 @@ exports.todayAlerts = onRequest(httpOpts, async (req, res) => {
   try {
     const alerts = await getTodayAlerts();
 
-    let alerts_response = "";
+    let alertsResponse = "";
 
     if (alerts.length === 0) {
-      alerts_response = "No alerts found for today.";
+      alertsResponse = "No alerts found for today.";
     } else {
-      alerts_response = alerts_response + "Alerts for today:<br/>";
+      alertsResponse = alertsResponse + "Alerts for today:<br/>";
       alerts.forEach((alert) => {
-        alerts_response = alerts_response + `Priority: ${alert.priority}<br/>Message: ${alert.message}<br/> <hr>`;
+        alertsResponse = alertsResponse +
+          `Priority: ${alert.priority}<br/>` +
+          `Message: ${alert.message}<br/> <hr>`;
       });
     }
 
 
-    res.send(alerts_response);
+    res.send(alertsResponse);
   } catch (error) {
     console.error("Error in todayAlerts function:", error);
     res.status(500).send("Error retrieving today's alerts");

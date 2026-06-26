@@ -26,7 +26,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 // Function to estimate Peak Ground Acceleration (PGA) using a simple attenuation relationship
-function estimatePGA(magnitude, distance) {
+function estimatePGA(magnitude, distanceKm, depthKm) {
   // This is a simplified version of the Boore-Atkinson (2008) ground motion prediction equation
   // Note: This is still an approximation and should be used cautiously
   const a = 0.03615;
@@ -34,10 +34,13 @@ function estimatePGA(magnitude, distance) {
   const c = -0.00114;
   const d = -0.647;
 
-  const R = Math.sqrt(distance * distance + 30 * 30); // Accounting for depth
-  const logPGA = a + b * (magnitude - 6) + c * (magnitude - 6) * (magnitude - 6) + d * Math.log(R);
+  // Accounting for depth
+  const R = Math.sqrt(distanceKm * distanceKm + depthKm * depthKm);
+  const log10PGA =
+        a + b * (magnitude - 6) + c * (magnitude - 6) * (magnitude - 6) +
+        d * Math.log10(R);
 
-  return Math.exp(logPGA);
+  return Math.pow(10, log10PGA);
 }
 
 // Function to determine alert priority based on magnitude and depth

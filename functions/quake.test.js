@@ -36,24 +36,34 @@ test("Kuji M6.9 regression: in range, priority 1 (mag tier)", () => {
   assert.equal(determineAlertPriority(mag, depth), 1);
 });
 
-// These estimatePGA assertions lock the CURRENT formula and 2-arg signature.
-// Phase 1 fixes the call-site arg bug and the log10/depth formula, which will
-// deliberately change these numbers — update them RED->GREEN at that point.
+// estimatePGA(magnitude, distanceKm, depthKm) uses the real hypocentral
+// distance R = sqrt(distance^2 + depth^2) and base-10 GMPE constants.
 test("estimatePGA returns a positive, finite number", () => {
-  const pga = estimatePGA(6.0, 100);
+  const pga = estimatePGA(6.0, 100, 10);
   assert.ok(Number.isFinite(pga) && pga > 0, `got ${pga}`);
 });
 
 test("estimatePGA increases with magnitude at a fixed distance", () => {
-  assert.ok(estimatePGA(7.0, 100) > estimatePGA(6.0, 100));
+  assert.ok(estimatePGA(7.0, 100, 10) > estimatePGA(6.0, 100, 10));
 });
 
-test("estimatePGA decreases with distance at a fixed magnitude", () => {
-  assert.ok(estimatePGA(6.0, 10) > estimatePGA(6.0, 100));
+test("estimatePGA decreases with epicentral distance", () => {
+  assert.ok(estimatePGA(6.0, 10, 10) > estimatePGA(6.0, 100, 10));
 });
 
-test("estimatePGA pins the current formula output", () => {
-  assert.ok(Math.abs(estimatePGA(6.0, 10) - 0.1109685) < 1e-6);
+test("estimatePGA decreases with depth (deeper quake, less shaking)", () => {
+  // Old code ignored real depth (fixed 30km); depth must now matter.
+  assert.ok(estimatePGA(6.0, 100, 10) > estimatePGA(6.0, 100, 600));
+});
+
+test("estimatePGA scales per magnitude in base 10, not natural log", () => {
+  // ~10^0.229 ≈ 1.69x per magnitude unit; natural log would give ~1.26x.
+  const ratio = estimatePGA(7.0, 100, 10) / estimatePGA(6.0, 100, 10);
+  assert.ok(Math.abs(ratio - 1.69) < 0.05, `got ${ratio}`);
+});
+
+test("estimatePGA pins the corrected formula output", () => {
+  assert.ok(Math.abs(estimatePGA(6.0, 10, 10) - 0.19577931) < 1e-6);
 });
 
 test("magnitude 7.0+ is always priority 2", () => {
@@ -82,4 +92,33 @@ test("M4.5-4.9 alerts as priority 0 only when depth < 30", () => {
 test("below M4.5 never alerts", () => {
   assert.equal(determineAlertPriority(4.4, 5), -1);
   assert.equal(determineAlertPriority(3.0, 5), -1);
+});
+
+// I17 seam: index.js gates an alert on BOTH isWithinAlertRange (magnitude →
+// radius) AND determineAlertPriority(...) >= 0 (magnitude + depth). These two
+// independent gates must stay aligned; these tests pin where they interact.
+const alerts = (mag, distanceKm, depth) =>
+  isWithinAlertRange(mag, distanceKm) &&
+  determineAlertPriority(mag, depth) >= 0;
+
+test("seam: a shallow M4.5 within 300km alerts", () => {
+  assert.equal(alerts(4.5, 250, 20), true);
+});
+
+test("seam: a deep M4.5 within 300km does not alert (priority gate)", () => {
+  // In range, but depth >= 30 makes determineAlertPriority return -1.
+  assert.equal(isWithinAlertRange(4.5, 250), true);
+  assert.equal(alerts(4.5, 250, 40), false);
+});
+
+test("seam: an M4.5 beyond 300km does not alert (range gate)", () => {
+  // Shallow enough for priority 0, but the range gate excludes it.
+  assert.equal(determineAlertPriority(4.5, 20) >= 0, true);
+  assert.equal(alerts(4.5, 350, 20), false);
+});
+
+test("seam: both gates share the M4.5 floor — below it never alerts", () => {
+  assert.equal(isWithinAlertRange(4.4, 10), false);
+  assert.equal(determineAlertPriority(4.4, 10), -1);
+  assert.equal(alerts(4.4, 10, 10), false);
 });

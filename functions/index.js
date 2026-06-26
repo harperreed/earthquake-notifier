@@ -7,6 +7,7 @@ const axios = require("axios");
 const Pushover = require("pushover-notifications");
 const {getAISummary} = require("./ai");
 const {isWithinAlertRange} = require("./alertRange");
+const {groupByPriority} = require("./alertGrouping");
 const {
   calculateDistance,
   estimatePGA,
@@ -61,7 +62,7 @@ async function checkEarthquake(latitude, longitude, radius) {
             depth,
         );
 
-        const estimatedPGA = estimatePGA(earthquakeInfo.mag, depth, distance);
+        const estimatedPGA = estimatePGA(earthquakeInfo.mag, distance, depth);
 
 
         if (alertPriority >= 0) {
@@ -79,23 +80,22 @@ async function checkEarthquake(latitude, longitude, radius) {
         return "No new significant earthquakes detected.";
       }
 
+      // Process alerts for each priority bucket, most urgent first, so the
+      // returned message reflects the highest-priority alert (not the last).
+      const groups = groupByPriority(earthquakeData);
       let message = "";
-      // Process alerts for each priority level
-      for (let priority = 2; priority >= 0; priority--) {
-        const priorityEarthquakes = earthquakeData.filter(
-            (eq) => eq.alertPriority === priority,
-        );
-        if (priorityEarthquakes.length > 0) {
-          message = await manufactureAlert(
-              JSON.stringify(priorityEarthquakes),
-          );
-          await sendAlert(message, priority);
-          await storeAlertInFirebase(
-              priorityEarthquakes,
-              message,
-              priority,
-          );
+      for (const group of groups) {
+        const alertMessage = await manufactureAlert(group.earthquakes);
+        // The first (highest-priority) bucket drives the returned message.
+        if (message === "") {
+          message = alertMessage;
         }
+        await sendAlert(alertMessage, group.priority);
+        await storeAlertInFirebase(
+            group.earthquakes,
+            alertMessage,
+            group.priority,
+        );
       }
 
       // Mark all earthquakes as having sent an alert

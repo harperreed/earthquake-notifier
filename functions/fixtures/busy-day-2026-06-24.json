@@ -1,0 +1,80 @@
+[
+  {
+    "type": "Feature",
+    "properties": {
+      "mag": 6.5,
+      "place": "12 km NE of Koshu, Japan",
+      "time": 1782340000000,
+      "magType": "mww",
+      "type": "earthquake",
+      "title": "M 6.5 - 12 km NE of Koshu, Japan"
+    },
+    "geometry": {"type": "Point", "coordinates": [138.9, 35.8, 25]},
+    "id": "busyday-koshu-m65"
+  },
+  {
+    "type": "Feature",
+    "properties": {
+      "mag": 6.8,
+      "place": "8 km S of Fuefuki, Japan",
+      "time": 1782341000000,
+      "magType": "mww",
+      "type": "earthquake",
+      "title": "M 6.8 - 8 km S of Fuefuki, Japan"
+    },
+    "geometry": {"type": "Point", "coordinates": [138.4, 35.55, 40]},
+    "id": "busyday-fuefuki-m68"
+  },
+  {
+    "type": "Feature",
+    "properties": {
+      "mag": 6.1,
+      "place": "5 km E of Enzan, Japan",
+      "time": 1782342000000,
+      "magType": "mww",
+      "type": "earthquake",
+      "title": "M 6.1 - 5 km E of Enzan, Japan"
+    },
+    "geometry": {"type": "Point", "coordinates": [138.73, 35.7, 30]},
+    "id": "busyday-enzan-m61"
+  },
+  {
+    "type": "Feature",
+    "properties": {
+      "mag": 4.4,
+      "place": "2 km N of Kofu, Japan",
+      "time": 1782343000000,
+      "magType": "mb",
+      "type": "earthquake",
+      "title": "M 4.4 - 2 km N of Kofu, Japan"
+    },
+    "geometry": {"type": "Point", "coordinates": [138.6, 35.66, 10]},
+    "id": "busyday-noise-m44"
+  },
+  {
+    "type": "Feature",
+    "properties": {
+      "mag": 3.9,
+      "place": "3 km SW of Kofu, Japan",
+      "time": 1782344000000,
+      "magType": "mb",
+      "type": "earthquake",
+      "title": "M 3.9 - 3 km SW of Kofu, Japan"
+    },
+    "geometry": {"type": "Point", "coordinates": [138.55, 35.62, 8]},
+    "id": "busyday-noise-m39"
+  },
+  {
+    "type": "Feature",
+    "properties": {
+      "mag": 4.1,
+      "place": "11 km W of Matsumoto, Japan",
+      "time": 1782345000000,
+      "magType": "mb",
+      "type": "earthquake",
+      "title": "M 4.1 - 11 km W of Matsumoto, Japan"
+    },
+    "geometry": {"type": "Point", "coordinates": [137.95, 36.0, 15]},
+    "id": "busyday-noise-m41"
+  }
+]

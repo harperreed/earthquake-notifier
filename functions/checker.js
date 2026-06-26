@@ -2,6 +2,9 @@
 // ABOUTME: injected so the logic runs against the emulator or real Firebase.
 
 const axios = require("axios");
+// FieldValue is a stateless sentinel factory; importing it needs no
+// initializeApp, so this module stays free of Firebase bootstrapping.
+const {FieldValue} = require("firebase-admin/firestore");
 const {getAISummary} = require("./ai");
 const {sendPushover} = require("./notify");
 const {isWithinAlertRange} = require("./alertRange");
@@ -13,6 +16,63 @@ const {
   determineAlertPriority,
 } = require("./quake");
 
+// Bound a hung USGS request so the scheduled run can't block indefinitely.
+const REQUEST_TIMEOUT_MS = 10000;
+// The scheduler runs twice an hour, so a two-hour window absorbs a missed run
+// plus USGS ingestion lag while keeping the result set small instead of
+// querying all of recorded history.
+const RECENT_WINDOW_MS = 2 * 60 * 60 * 1000;
+// Japan Standard Time is a fixed UTC+9 with no daylight saving, so the "today"
+// boundary is a constant nine-hour shift from UTC.
+const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+// Dedup markers exist only to suppress repeat alerts; 30 days outlives any
+// quake's "recent" window, after which a Firestore TTL policy can reap them so
+// the collection never grows without bound.
+const SENT_ALERT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Builds the USGS FDSN query URL for recent earthquakes around a point.
+ * @param {Object} params Query parameters.
+ * @param {string} params.base USGS API base URL.
+ * @param {string} params.latitude Center latitude.
+ * @param {string} params.longitude Center longitude.
+ * @param {string} params.radius Search radius in km.
+ * @param {string} params.startTime ISO8601 lower bound on event time.
+ * @return {string} The fully-formed query URL.
+ */
+function buildQueryUrl({base, latitude, longitude, radius, startTime}) {
+  return `${base}/fdsnws/event/1/query?format=geojson` +
+      `&latitude=${latitude}&longitude=${longitude}` +
+      `&maxradiuskm=${radius}&starttime=${startTime}`;
+}
+
+/**
+ * Returns the lower bound for the USGS time window: a fixed interval before
+ * the given moment.
+ * @param {Date} now The current time.
+ * @return {string} An ISO8601 timestamp RECENT_WINDOW_MS before now.
+ */
+function recentWindowStart(now) {
+  return new Date(now.getTime() - RECENT_WINDOW_MS).toISOString();
+}
+
+/**
+ * Computes the start of "today" in Japan Standard Time, returned as a UTC
+ * instant, so the daily digest rolls over at JST midnight rather than at the
+ * server's UTC midnight.
+ * @param {Date} now The current time.
+ * @return {Date} The UTC instant of 00:00 JST for now's JST day.
+ */
+function startOfTodayTokyo(now) {
+  const jst = new Date(now.getTime() + JST_OFFSET_MS);
+  const midnightUtcLabelled = Date.UTC(
+      jst.getUTCFullYear(),
+      jst.getUTCMonth(),
+      jst.getUTCDate(),
+  );
+  return new Date(midnightUtcLabelled - JST_OFFSET_MS);
+}
+
 // The Firestore instance is injected by createChecker so this module stays free
 // of Firebase initialization and can run against the emulator or real Firebase.
 let db;
@@ -20,27 +80,34 @@ let db;
 // Function to check for earthquakes with parameters
 async function checkEarthquake(latitude, longitude, radius) {
   const base = process.env.USGS_API_URL || "https://earthquake.usgs.gov";
-  const url = `${base}/fdsnws/event/1/query?` +
-      `format=geojson&latitude=${latitude}&` +
-      `longitude=${longitude}&maxradiuskm=${radius}`;
+  const url = buildQueryUrl({
+    base,
+    latitude,
+    longitude,
+    radius,
+    startTime: recentWindowStart(new Date()),
+  });
   console.log(url);
   let result = {status: "ok", found: 0, sent: 0, error: null};
   try {
-    const response = await axios.get(url);
+    const response = await axios.get(url, {timeout: REQUEST_TIMEOUT_MS});
     const data = response.data;
     const earthquakeData = [];
 
-    if (data.features && data.features.length > 0) {
-      for (const earthquake of data.features) {
+    const features = data.features || [];
+    if (features.length > 0) {
+      // One batched read of every dedup marker up front, so a busy day is a
+      // single Firestore round-trip instead of one read per quake.
+      const sentIds = await fetchSentIds(features.map((eq) => eq.id));
+
+      for (const earthquake of features) {
         const earthquakeInfo = earthquake.properties;
-        const earthquakeId = earthquake.id;
         const [eqLongitude, eqLatitude, depth] =
                     earthquake.geometry.coordinates;
 
-        // Check if an alert for this earthquake ID has already been sent
-        const isAlertSent = await checkIfAlertSent(earthquakeId);
-        if (isAlertSent) {
-          continue; // Skip this earthquake as an alert has already been sent
+        // Skip quakes already alerted on in an earlier run.
+        if (sentIds.has(earthquake.id)) {
+          continue;
         }
 
         // Calculate distance from the specified point
@@ -119,7 +186,7 @@ async function checkEarthquake(latitude, longitude, radius) {
 async function storeAlertInFirebase(earthquakes, message, priority) {
   try {
     const alertRef = await db.collection("alerts").add({
-      timestamp: new Date(),
+      timestamp: FieldValue.serverTimestamp(),
       message: message,
       priority: priority,
       earthquakes: earthquakes.map((eq) => ({
@@ -221,7 +288,7 @@ async function sendAdminAlert(detail) {
 async function writeHeartbeat(result) {
   try {
     await db.collection("health").doc("heartbeat").set({
-      timestamp: new Date(),
+      timestamp: FieldValue.serverTimestamp(),
       status: result.status,
       found: result.found,
       sent: result.sent,
@@ -232,11 +299,21 @@ async function writeHeartbeat(result) {
   }
 }
 
-// Function to check if an alert has already been sent for a given earthquake ID
-async function checkIfAlertSent(earthquakeId) {
+/**
+ * Reads every dedup marker in one batched getAll so a run makes a single
+ * Firestore round-trip regardless of how many quakes USGS returned.
+ * @param {Array<string>} ids Earthquake IDs to look up.
+ * @return {Promise<Set<string>>} The subset of ids already marked sent.
+ */
+async function fetchSentIds(ids) {
+  if (ids.length === 0) {
+    return new Set();
+  }
   try {
-    const doc = await db.collection("sent_alerts").doc(earthquakeId).get();
-    return doc.exists;
+    const refs = ids.map((id) => db.collection("sent_alerts").doc(id));
+    const snaps = await db.getAll(...refs);
+    const present = snaps.filter((snap) => snap.exists);
+    return new Set(present.map((snap) => snap.id));
   } catch (error) {
     console.error("Error checking alert status:", error);
     throw error;
@@ -258,7 +335,9 @@ async function markAlertsAsSent(earthquakes) {
     const batch = db.batch();
     for (const earthquake of earthquakes) {
       const ref = db.collection("sent_alerts").doc(earthquake.id);
-      batch.set(ref, {...earthquake, sent: true});
+      // TTL field; a Firestore policy on expireAt auto-reaps stale markers.
+      const expireAt = new Date(Date.now() + SENT_ALERT_TTL_MS);
+      batch.set(ref, {...earthquake, sent: true, expireAt});
     }
     await batch.commit();
     console.log(`Marked ${earthquakes.length} earthquake(s) as sent.`);
@@ -271,8 +350,7 @@ async function markAlertsAsSent(earthquakes) {
 // Function to get today's alerts
 async function getTodayAlerts() {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = startOfTodayTokyo(new Date());
 
     const alertsSnapshot = await db.collection("alerts")
         .where("timestamp", ">=", today)
@@ -307,4 +385,10 @@ function createChecker(injectedDb) {
   return {checkEarthquake, getTodayAlerts};
 }
 
-module.exports = {createChecker};
+module.exports = {
+  createChecker,
+  buildQueryUrl,
+  recentWindowStart,
+  startOfTodayTokyo,
+  REQUEST_TIMEOUT_MS,
+};

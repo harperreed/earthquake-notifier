@@ -3,9 +3,14 @@ const {initializeApp} = require("firebase-admin/app");
 const {getFirestore} = require("firebase-admin/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {defineSecret} = require("firebase-functions/params");
+const {setGlobalOptions} = require("firebase-functions/v2");
 
 const {createChecker} = require("./checker");
 const {authorize, clampRadius} = require("./httpAuth");
+
+// Cap every function at one concurrent instance so two runs cannot race on the
+// sent-alert dedup and double-notify; this is a low-traffic personal notifier.
+setGlobalOptions({maxInstances: 1});
 
 // Initialize Firebase
 initializeApp();
@@ -65,8 +70,11 @@ exports.earthquakeCheck = onRequest(httpOpts, async (req, res) => {
   res.send(result);
 });
 
-// Scheduled Function
-exports.earthquakeCheckCrontab = onSchedule("*/30 * * * *", async (event) => {
+// Scheduled Function. JST timezone keeps the cadence stable against Japan's
+// clock and documents the monitored region; maxInstances:1 (set globally)
+// prevents two runs from racing on the sent-alert dedup.
+const crontabOptions = {schedule: "*/30 * * * *", timeZone: "Asia/Tokyo"};
+exports.earthquakeCheckCrontab = onSchedule(crontabOptions, async (event) => {
   const latitude = "35.662139";
   const longitude = "138.568222";
   // Wide query radius; alertRange gates alerts by magnitude.

@@ -102,9 +102,16 @@ test("Jimny delivery survives a real OpenAI outage", async (t) => {
     const [terse, adminAlert] = pushoverMessages;
 
     // Shindo leads: the real PGA model puts the far M6.9 at est. shindo 4.
+    // The line is unchanged through P1, then carries the quake-age suffix. The
+    // fixture quake is days old by runtime, so pin the suffix's shape (a
+    // relative age plus JST + Central CDT/CST clocks), not its volatile value.
     assert.match(
         terse.message,
-        /^est\. shindo 4 · M6\.9 · \d+km \w+ of Kofu · depth 51km · P1$/,
+        /^est\. shindo 4 · M6\.9 · \d+km \w+ of Kofu · depth 51km · P1 · /,
+    );
+    assert.match(
+        terse.message,
+        /· .+ \(\d{2}:\d{2} JST \/ \d{2}:\d{2} C[DS]T\)$/,
     );
     assert.equal(terse.priority, 1);
     assert.equal(terse.html, 1);

@@ -237,8 +237,10 @@ async function storeAlertInFirebase(earthquakes, message, priority) {
  * @return {Promise<boolean>} True when the terse line was confirmed delivered.
  */
 async function deliverGroup(group, fromLat, fromLng) {
+  // One clock read stamps every line in this batch with a consistent "now".
+  const nowMs = Date.now();
   const terseMessage = group.earthquakes
-      .map((eq) => alertLineForQuake(eq, fromLat, fromLng))
+      .map((eq) => alertLineForQuake(eq, fromLat, fromLng, nowMs))
       .join("<br/>");
   // Felt quakes (internal priority 0) deliver at the audible floor so they are
   // never silenceable; higher priorities are unchanged.
